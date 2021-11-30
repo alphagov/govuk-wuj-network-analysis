@@ -16,6 +16,7 @@ ASSUMPTIONS:
 
 REQUIREMENTS: 
 - Run `step_one_identify_seed_pages.ipynb` to define seed0 and seed1 pages
+- `seed1_pages` must be manually copied into `SET seed1_pages `
 */ 
 
 
