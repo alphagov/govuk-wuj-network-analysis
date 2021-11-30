@@ -2,6 +2,8 @@
 page for the economic recovery whole user journey.
 
 ASSUMPTIONS:
+- URL parameteres/anchors are removed from the page paths, as we are only interested in the 
+  the gov.uk page path. 
 - Seed1 pages found in the footer of the page have been removed
 - Certain document types have been ignored, see `document_types_to_ignore`
 - Session data has been retrieved from a week's worth of data: 20210803 - 20210809
@@ -150,6 +152,6 @@ SELECT
     sessionId,
     hitNumber,
     pagePath,
-FROM sessions_truncate_smart_answer_urls
+FROM sessions_truncate_urls
 WHERE sessionId IN (SELECT sessionId FROM sessions_with_seed_0_or_1)
 ORDER BY sessionId, hitNumber
