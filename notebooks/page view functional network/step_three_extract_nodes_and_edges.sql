@@ -18,7 +18,7 @@ OUTPUT:
 
 REQUIREMENTS: 
 - Run `step_one_identify_seed_pages.ipynb` to define seed0 and seed1 pages
-- Run `step_two_extract_page_hits.ipynb` to extract page hits for sessions that visit 
+- Run `step_two_extract_page_hits.sql` to extract page hits for sessions that visit 
   at least one seed0 or seed1 page
 */ 
 
