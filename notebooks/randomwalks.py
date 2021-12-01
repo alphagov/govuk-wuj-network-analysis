@@ -1,6 +1,9 @@
 import numpy as np
 import networkx as nx
 from tqdm.notebook import tqdm
+import matplotlib.pyplot as plt
+from itertools import product
+from joblib import Parallel, delayed
 
 def group(original_list, n):
     '''Groups original_list into a list of lists, where each list contains n consecutive
@@ -8,24 +11,28 @@ def group(original_list, n):
     return [original_list[x:x+n] for x in range(0,len(original_list),n)]
 
 
-def evaluate(true_pages, predicted_pages):
+def evaluate(true_pages, predicted_pages, beta=2):
     '''
     true_pages is a list of all the pages known to belong to a WUJ
     predicted_pages ia a list of pages predicted to belong to a WUJ
+    beta determines how much more important recall is than precision when computing fscore
     
-    returns precision and recall as percentages
+    returns precision, recall and fscore
     '''
     
     true_pages = set(true_pages)
     predicted_pages = set(predicted_pages)
     
     # what proportion of true pages were correctly predicted?
-    recall = len(true_pages.intersection(predicted_pages))/len(true_pages)*100
+    recall = len(true_pages.intersection(predicted_pages))/len(true_pages)
     
     # what proportion of predicted pages are true pages?
-    precision = len(true_pages.intersection(predicted_pages))/len(predicted_pages)*100
+    precision = len(true_pages.intersection(predicted_pages))/len(predicted_pages)
+
+    # compute f score, a harmonic mean of precision and recall
+    fscore = ((1 + beta**2) * (precision * recall))/((precision * beta**2) + recall)
     
-    return (precision, recall)
+    return (precision, recall, fscore)
 
 def getSlugs(G):
     '''
@@ -33,14 +40,15 @@ def getSlugs(G):
     '''
     return [node[1]['properties']['name'] for node in G.nodes(data=True)]
 
-def showGraph(G, figsize=None):
+def showGraph(G, k=None, iterations=50, node_size=100, figsize=None):
     '''
     Prints graph information and plots the graph, G.
     Takes figsize as input, a tuple, e.g. (10,10)
     '''
     print(nx.info(G))
+    nx.spring_layout(G, k=k, iterations=iterations)
     plt.figure(figsize=(figsize))
-    nx.draw(G)
+    nx.draw(G, node_size=node_size)
 
 def random_walk(A, G, steps, seed, p=False):
     '''
@@ -95,9 +103,9 @@ def random_walk(A, G, steps, seed, p=False):
         
     return np.array(G.nodes())[visited]
 
-def walk_get_slugs(T,G,N,seed_page,proba):
-    '''Just gets slugs from a random walk'''
-    return getSlugs(G.subgraph(random_walk(T,G,N,seed_page,proba)))
+def M_walks_get_slugs(T,G,steps,repeats,seed_page,proba):
+    '''Gets slugs from 'repeats' many random walks for a given seed page'''
+    return [getSlugs(G.subgraph(random_walk(T,G,steps,seed_page,proba))) for _ in range(repeats)]
 
 def check_seed_pages(seeds, G):
     G_nodes = set([node[1]['properties']['name'] for node in G.nodes(data=True)])
@@ -108,9 +116,9 @@ def check_seed_pages(seeds, G):
     else:
         return []
     
-def repeat_random_walks(N, M, T, G, seed_pages, proba, combine, n_jobs=1):
+def repeat_random_walks(steps, repeats, T, G, seed_pages, proba, combine, level=0, verbose=1, n_jobs=1):
     '''
-    Performs M random walks per seed page in seed_pages, each with N steps. seed_pages is a list
+    Performs 'repeats' many random walks per seed page in seed_pages, each with 'steps' many steps. seed_pages is a list
     of page slugs. e.g. 
     ['/government/collections/ip-enforcement-reports',
     '/government/publications/annual-ip-crime-and-enforcement-report-2020-to-2021',
@@ -125,18 +133,24 @@ def repeat_random_walks(N, M, T, G, seed_pages, proba, combine, n_jobs=1):
     
     If combine is set to 'no', then a list of len(seed_pages) lists will be
     returned. Each list will contain the paths of the M random walks performed per seed node.
+
+    if combine = 'union' or 'intersection:
+    level = 0 unions/intersects the pages visited by all 'repeats' many random walks
+    at the level of seed nodes, giving you one set of pages per seed node.
+    level = 1 unions/intersects the pages visited by all repeats*len(seed_pages) random walks,
+    giving you one set of pages.
     
     T is an adjaceny matrix or a transition probability matrix. They are CSR sparse matrices.
     If using a probability transition matrix, set proba=True.
+
+    verbose >= 1 if you want progress bars. verbose <= 0 if you don't want progress bars.
     
     n_jobs is the number of CPUs to use.
-    For large experiments, I recommend n_jobs = -2, to use all but 1 of your CPUs.
+    For large experiments, I recommend n_jobs = -2, to use all but 1 of your CPUs, leaving
+    1 CPU available for other tasks.
     For small experiments, I recommend n_jobs = 1. The overhead of n_jobs > 1 is only
-    worth it for large experiments.
+    worth it for large experiments, e.g. when M > 100.
     '''
-    
-    from itertools import product 
-    from joblib import Parallel, delayed
 
     # find seed pages not found in the graph
     not_found = set(check_seed_pages(seed_pages, G))
@@ -144,18 +158,27 @@ def repeat_random_walks(N, M, T, G, seed_pages, proba, combine, n_jobs=1):
     # remove seed pages not found in the graph
     seed_pages = [page for page in seed_pages if page not in not_found]
 
-    # create list to loop over
-    # it repeats each seed_page M times
-    seeds_Ms = list(product(seed_pages,list(range(M))))
-
-    paths_taken = Parallel(n_jobs=n_jobs)(delayed(walk_get_slugs)(T,G,N,seed_page,proba) for seed_page,_ in tqdm(seeds_Ms))
-
+    # for each seed node, compute paths taken
+    if verbose >= 1:
+        paths_taken = Parallel(n_jobs=n_jobs)(delayed(M_walks_get_slugs)(T,G,steps,repeats,seed_page,proba) for seed_page in tqdm(seed_pages))
+    else:
+        paths_taken = Parallel(n_jobs=n_jobs)(delayed(M_walks_get_slugs)(T,G,steps,repeats,seed_page,proba) for seed_page in seed_pages)
+    
     if combine == 'union':
-        pages_visited = {page for path in paths_taken for page in path}
+        if level == 0:
+            pages_visited = [set([page for path in paths for page in path]) for paths in paths_taken]
+        elif level == 1:
+            pages_visited = {page for paths in paths_taken for path in paths for page in path}
+
     elif combine == 'intersection':
-        pages_visited = set.intersection(*map(set,paths_taken))
+        if level == 0:
+            pages_visited = [set.intersection(*map(set,paths)) for paths in paths_taken]
+        elif level == 1:
+            pages_visited = set.intersection(*[set([page for path in paths for page in path]) for paths in paths_taken])
+
     elif combine == 'no':
-        pages_visited = group([list(set(path))for path in paths_taken], M)
+        pages_visited = paths_taken
+
     else:
         print(combine, 'is an invalid path combination method')
         return
@@ -165,3 +188,32 @@ def repeat_random_walks(N, M, T, G, seed_pages, proba, combine, n_jobs=1):
         return
 
     return {'seeds': seed_pages, 'pages_visited': pages_visited}
+
+def M_N_Experiment(steps, repeats, T, G, target_pages, seed_pages, proba, n_jobs):
+    '''
+    For a given transition matrix T, graph G, set of WUJ target_pages and seed_pages within a WUJ,
+    this function tries every combination of steps and repeats. E.g.
+
+    Number of steps to take in random walk
+    steps = [10,20,30,40,50,60,70,80,90,100,200,300,400,500,600]
+
+    Number of times to initialise random walk from a given seed node
+    repeats = [10,20,30,40,50,60,70,80,90,100,200,300,400,500,600]
+
+    Set proba=True if T contains probabilities, and proba=False if T is an adjacency matrix.
+
+    n_jobs = number of workers to use during execution, for parallelisation.
+    '''
+    # all combinations of N and M
+    NMs = list(product(steps,repeats))
+
+    results = Parallel(n_jobs=n_jobs)(delayed(repeat_random_walks)(step, repeat, T, G, seed_pages, proba, 'union', 1, 0, 1) for step, repeat in tqdm(NMs))
+
+    scores = []
+    for i, result in enumerate(results):
+        path = result['pages_visited']
+        p, r, f = evaluate(target_pages, path)
+        n, m = NMs[i]
+        scores.append([p,r,f,n,m,len(path)])
+
+    return scores
