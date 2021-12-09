@@ -111,6 +111,8 @@ WITH primary_data AS (
         CONCAT(fullVisitorId, "-", CAST(visitId AS STRING)) AS sessionId,
         (SELECT value FROM hits.customDimensions WHERE index = 2) AS documentType,
         (SELECT value FROM hits.customDimensions WHERE index = 4) AS contentID,
+        hits.isEntrance,
+        hits.isExit
     FROM `govuk-bigquery-analytics.87773428.ga_sessions_*`
     CROSS JOIN UNNEST(hits) AS hits
     WHERE
@@ -155,7 +157,9 @@ SELECT
     hitNumber,
     pagePath,
     contentID,
-    documentType
+    documentType,
+    isEntrance,
+    isExit
 FROM sessions_truncate_urls
 WHERE sessionId IN (SELECT sessionId FROM sessions_with_seed_0_or_1)
 ORDER BY sessionId, hitNumber
