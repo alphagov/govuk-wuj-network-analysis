@@ -39,6 +39,8 @@ WITH page_view_approach AS (
 source_destination_page_path AS ( 
     SELECT
         sessionId,
+        contentID,
+        documentType,
         pagePath AS sourcePagePath,
         LEAD(pagePath) OVER (PARTITION BY sessionId ORDER BY hitNumber) AS destinationPagePath
     FROM page_view_approach
@@ -47,10 +49,12 @@ source_destination_page_path AS (
 -- Number of session hits for sourcePagePath 
 SELECT
     sourcePagePath,
-    COUNT(DISTINCT sessionId) AS sourcePageSessionHits
+    COUNT(DISTINCT sessionId) AS sourcePageSessionHits,
+    documentType,
+    contentID
 FROM source_destination_page_path
-    WHERE sourcePagePath != '/transition' -- this redirects to /brexit
-GROUP BY sourcePagePath 
+    WHERE sourcePagePath != '/transition' -- this pagePath disrupts step_four and is therefore removed 
+GROUP BY sourcePagePath, documentType, contentID 
 ORDER BY sourcePageSessionHits DESC
 
 );

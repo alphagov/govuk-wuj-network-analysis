@@ -109,7 +109,8 @@ WITH primary_data AS (
         hits.hitNumber,
         REGEXP_REPLACE(hits.page.pagePath, r'[?#].*', '') AS pagePath,
         CONCAT(fullVisitorId, "-", CAST(visitId AS STRING)) AS sessionId,
-        (SELECT value FROM hits.customDimensions WHERE index = 2) AS documentType
+        (SELECT value FROM hits.customDimensions WHERE index = 2) AS documentType,
+        (SELECT value FROM hits.customDimensions WHERE index = 4) AS contentID,
     FROM `govuk-bigquery-analytics.87773428.ga_sessions_*`
     CROSS JOIN UNNEST(hits) AS hits
     WHERE
@@ -153,6 +154,8 @@ SELECT
     sessionId,
     hitNumber,
     pagePath,
+    contentID,
+    documentType
 FROM sessions_truncate_urls
 WHERE sessionId IN (SELECT sessionId FROM sessions_with_seed_0_or_1)
 ORDER BY sessionId, hitNumber
