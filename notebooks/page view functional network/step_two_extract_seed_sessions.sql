@@ -110,7 +110,6 @@ WITH primary_data AS (
         REGEXP_REPLACE(hits.page.pagePath, r'[?#].*', '') AS pagePath,
         CONCAT(fullVisitorId, "-", CAST(visitId AS STRING)) AS sessionId,
         (SELECT value FROM hits.customDimensions WHERE index = 2) AS documentType,
-        (SELECT value FROM hits.customDimensions WHERE index = 4) AS contentID,
         hits.isEntrance,
         hits.isExit
     FROM `govuk-bigquery-analytics.87773428.ga_sessions_*`
@@ -156,7 +155,6 @@ SELECT
     sessionId,
     hitNumber,
     pagePath,
-    contentID,
     documentType,
     isEntrance,
     isExit

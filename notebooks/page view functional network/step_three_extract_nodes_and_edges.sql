@@ -37,7 +37,6 @@ OUTPUT:
   - `govuk-bigquery-analytics.wuj_network_analysis.nodes_er` 
     - Nodes = `sourcePagePath`
     - Node property = `documentType`
-    - Node property = `contentID`
     - Node property = `sourcePageSessionHitsAll`
     - Node property = `sourcePageSessionEntranceOnly`
     - Node property = `sourcePageSessionExitOnly`
@@ -70,7 +69,6 @@ source_destination_page_path AS (
     SELECT
         sessionId,
         pagePath AS sourcePagePath,
-        contentID,
         documentType,
         isEntrance,
         isExit,
@@ -83,7 +81,6 @@ session_hits AS (
     SELECT  
         sessionId,
         sourcePagePath,
-        contentID,
         documentType,
         isEntrance,
         isExit,
@@ -92,20 +89,19 @@ session_hits AS (
              WHEN (isEntrance AND isExit IS NULL) THEN 'isExit'
         END AS entranceOrExit
 FROM source_destination_page_path
-GROUP BY sessionId, sourcePagePath, documentType, contentID, isEntrance, isExit
+GROUP BY sessionId, sourcePagePath, documentType, isEntrance, isExit
 ),
 
--- aggregate rows over session, pagePath, contentID and document type and identify which 
+-- aggregate rows over session, pagePath and document type, and identify which 
 -- sessions have an entrance and/or exit hit for the pagePath    
 session_hits_all AS ( 
     SELECT 
         sessionId,
         sourcePagePath,
-        contentID,
         documentType,
         STRING_AGG(CAST(entranceOrExit AS STRING)) AS allTypesOfHitsInSession
     FROM session_hits
-    GROUP BY sourcePagePath, documentType, contentID, sessionId
+    GROUP BY sessionId, sourcePagePath, documentType
     ORDER BY allTypesOfHitsInSession
 )
 
@@ -116,13 +112,12 @@ session_hits_all AS (
 SELECT 
     sourcePagePath,
     documentType,
-    contentID,
     COUNT(DISTINCT sessionId) AS sourcePageSessionHitsAll,
     COUNT(DISTINCT (CASE WHEN allTypesOfHitsInSession = 'isEntrance' THEN sessionId ELSE null END) ) AS sourcePageSessionHitsEntranceOnly,
     COUNT(DISTINCT (CASE WHEN allTypesOfHitsInSession = 'isExit' THEN sessionId ELSE null END) ) AS sourcePageSessionHitsExitOnly,
     COUNT(DISTINCT (CASE WHEN STARTS_WITH(allTypesOfHitsInSession, 'isEntranceAndExit') OR STARTS_WITH(allTypesOfHitsInSession, 'isEntrance,') OR STARTS_WITH(allTypesOfHitsInSession, 'isExit,') THEN sessionId ELSE null END) ) AS sourcePageSessionHitsEntranceAndExit
 FROM session_hits_all 
-GROUP BY sourcePagePath, documentType, contentID 
+GROUP BY sourcePagePath, documentType 
 ORDER BY sourcePageSessionHitsAll DESC
 
 );
