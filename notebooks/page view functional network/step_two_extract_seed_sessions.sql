@@ -97,8 +97,8 @@ SET document_types_to_ignore = ['authored_article',
                                 'ministerial_role',
                                 'residential_property_tribunal_decision',
                                 'cma_case',
-                                'completed_transaction'
-];
+                                'completed_transaction',
+                                'Extension'];
 
 -- create table to store results
 CREATE OR REPLACE TABLE `govuk-bigquery-analytics.wuj_network_analysis.page_view_approach_er` AS
