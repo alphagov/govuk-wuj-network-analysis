@@ -187,7 +187,7 @@ def repeat_random_walks(steps, repeats, T, G, seed_pages, proba, combine, level=
         print("No pages found")
         return
 
-    return {'seeds': seed_pages, 'pages_visited': pages_visited}
+    return {'seeds': seed_pages, 'pages_visited': pages_visited, 'paths_taken': paths_taken}
 
 def M_N_Experiment(steps, repeats, T, G, target_pages, seed_pages, proba, n_jobs):
     '''
