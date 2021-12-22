@@ -127,18 +127,38 @@ def repeat_random_walks(steps, repeats, T, G, seed_pages, proba, combine, level=
     Each random walk will traverse a network of gov.uk pages, each one recording the set of pages
     that were visited.
     
-    M*len(seed_pages) many sets of pages will be generated. combine takes value 'intersection' or 'union',
-    depending on whether to compute the union or intersection of these sets. In either case, a single
-    set of pages is returned, containing only the unique pages visited.
+    repeats*len(seed_pages) many sets of pages will be generated.
     
+    combine takes value 'intersection' or 'union',
+    depending on whether to compute the union or intersection of these sets.
     If combine is set to 'no', then a list of len(seed_pages) lists will be
-    returned. Each list will contain the paths of the M random walks performed per seed node.
+    returned. Each list will contain the paths of the 'repeats' many random walks performed per seed node.
 
     if combine = 'union' or 'intersection:
     level = 0 unions/intersects the pages visited by all 'repeats' many random walks
     at the level of seed nodes, giving you one set of pages per seed node.
+
+    E.g. Suppose combine = 'union', level = 0, repeats = 2, and we have two seed nodes A and B.
+    From A, two random walks are performed, following the paths
+    [A,C,X,G,X,A] and [A,D,X,A]
+    These combine to become {A,C,D,G,X}
+
+    From B, two random walks are performed, following the paths
+    [B,O,P,L,D] and [B,O,M,N]
+    These combine to become {B,D,L,M,N,O,P}
+
+    Hence, we get a list of these two sets [{A,C,D,G,X}, {B,D,L,M,N,O,P}]
+
     level = 1 unions/intersects the pages visited by all repeats*len(seed_pages) random walks,
     giving you one set of pages.
+
+    E.g. Suppose combine = 'union', level = 1, repeats = 2, and we have two seed nodes A and B.
+    From A, two random walks are performed, following the paths
+    [A,C,X,G,X,A] and [A,D,X,A]
+    From B, two random walks are performed, following the paths
+    [B,O,P,L,D] and [B,O,M,N]
+    These four paths merge into a single set:
+    {A,B,C,D,L,M,N,O,P,X}
     
     T is an adjaceny matrix or a transition probability matrix. They are CSR sparse matrices.
     If using a probability transition matrix, set proba=True.
@@ -149,7 +169,7 @@ def repeat_random_walks(steps, repeats, T, G, seed_pages, proba, combine, level=
     For large experiments, I recommend n_jobs = -2, to use all but 1 of your CPUs, leaving
     1 CPU available for other tasks.
     For small experiments, I recommend n_jobs = 1. The overhead of n_jobs > 1 is only
-    worth it for large experiments, e.g. when M > 100.
+    worth it for large experiments, e.g. when repeats > 100.
     '''
 
     # find seed pages not found in the graph
