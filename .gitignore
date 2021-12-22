@@ -94,6 +94,7 @@ target/
 
 # Jupyter Notebook
 .ipynb_checkpoints
+invalidNotebookFixer.ipynb
 
 # IPython
 profile_default/
@@ -872,6 +873,9 @@ data/processed/*
 !data/raw/.gitkeep
 !data/interim/.gitkeep
 !data/processed/.gitkeep
+
+# Ignore html files in outputs
+outputs/*.html
 
 # Ignore the `docs/reference/api` folder
 docs/reference/api/*
