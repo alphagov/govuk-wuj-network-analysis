@@ -97,8 +97,8 @@ SET document_types_to_ignore = ['authored_article',
                                 'ministerial_role',
                                 'residential_property_tribunal_decision',
                                 'cma_case',
-                                'completed_transaction'
-];
+                                'completed_transaction',
+                                'Extension'];
 
 -- create table to store results
 CREATE OR REPLACE TABLE `govuk-bigquery-analytics.wuj_network_analysis.page_view_approach_er` AS
@@ -109,7 +109,9 @@ WITH primary_data AS (
         hits.hitNumber,
         REGEXP_REPLACE(hits.page.pagePath, r'[?#].*', '') AS pagePath,
         CONCAT(fullVisitorId, "-", CAST(visitId AS STRING)) AS sessionId,
-        (SELECT value FROM hits.customDimensions WHERE index = 2) AS documentType
+        (SELECT value FROM hits.customDimensions WHERE index = 2) AS documentType,
+        hits.isEntrance,
+        hits.isExit
     FROM `govuk-bigquery-analytics.87773428.ga_sessions_*`
     CROSS JOIN UNNEST(hits) AS hits
     WHERE
@@ -153,6 +155,9 @@ SELECT
     sessionId,
     hitNumber,
     pagePath,
+    documentType,
+    isEntrance,
+    isExit
 FROM sessions_truncate_urls
 WHERE sessionId IN (SELECT sessionId FROM sessions_with_seed_0_or_1)
 ORDER BY sessionId, hitNumber
