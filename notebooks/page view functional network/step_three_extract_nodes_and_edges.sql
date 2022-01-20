@@ -95,7 +95,7 @@ session_hits AS (
              WHEN (isEntrance AND isExit IS NULL) THEN 'isExit'
         END AS entranceOrExit
 FROM source_destination_page_path
-GROUP BY sessionId, sourcePagePath, documentType, isEntrance, isExit
+GROUP BY sessionId, sourcePagePath, documentType, topLevelTaxons, bottomLevelTaxons, isEntrance, isExit
 ),
 
 -- aggregate rows over session, pagePath, document type, top level taxons, and 
