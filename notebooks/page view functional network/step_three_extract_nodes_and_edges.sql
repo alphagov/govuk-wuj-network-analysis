@@ -32,6 +32,15 @@ ASSUMPTIONS:
 - The edge weight `edgeWeight` is the number of distinct sessions that move between Page A
   and Page B. 
 
+- On the rare occasion, some pagePaths are tagged to a different `documentType`, `bottomLevelTaxon`, 
+  or `topLevelTaxon`. While it is not clear why this is the case, it is possible that this is a problem
+  with the tracking. This is problematic for further analyses, as pagePaths may have multiple entries. 
+  Therefore, we only keep the entry with the highest session hit data. We have chosen the top entry as 
+  we are more confident that the tracking is correct, as it is likely that the other entries have very 
+  low session counts (less than 10, compared to 3000, for example). Note that therefore the top entry 
+  will not have captured the session hits for the other entries, so it is likely that count data is being 
+  underestimated. As this happens rarely, we accept this as a caveat to our data. 
+  
 OUTPUT: 
 - Two tables related to the nodes and edges of the network: 
   - `govuk-bigquery-analytics.wuj_network_analysis.nodes_er` 
