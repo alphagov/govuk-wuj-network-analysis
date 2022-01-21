@@ -103,22 +103,39 @@ session_hits_all AS (
     FROM session_hits
     GROUP BY sessionId, sourcePagePath, documentType
     ORDER BY allTypesOfHitsInSession
-)
+),
 
 -- count distinct sessions that visit a pagePath, count distinct sessions that visit
 -- a pagePath which are an entrance hit only, count distinct sessions that visit a 
 -- pagePath which are an exit hit only, count distinct sessions that visit a pagePath 
 -- which are both an entrance and exit hit
+pages_with_all_counts AS (
+    SELECT 
+        sourcePagePath,
+        documentType,
+        COUNT(DISTINCT sessionId) AS sourcePageSessionHitsAll,
+        COUNT(DISTINCT (CASE WHEN allTypesOfHitsInSession = 'isEntrance' THEN sessionId ELSE null END) ) AS sourcePageSessionHitsEntranceOnly,
+        COUNT(DISTINCT (CASE WHEN allTypesOfHitsInSession = 'isExit' THEN sessionId ELSE null END) ) AS sourcePageSessionHitsExitOnly,
+        COUNT(DISTINCT (CASE WHEN STARTS_WITH(allTypesOfHitsInSession, 'isEntranceAndExit') OR STARTS_WITH(allTypesOfHitsInSession, 'isEntrance,') OR STARTS_WITH(allTypesOfHitsInSession, 'isExit,') THEN sessionId ELSE null END) ) AS sourcePageSessionHitsEntranceAndExit
+    FROM session_hits_all 
+    GROUP BY sourcePagePath, documentType 
+    ORDER BY sourcePageSessionHitsAll DESC
+),
+
+-- select the top page path with document type, taxon, and session hit data. This is 
+-- because sometimes the tracking for taxons is incorrect, which results in multiple rows
+-- for the same page path. 
+pages_with_rank AS ( 
+    SELECT
+        *, 
+        ROW_NUMBER() OVER ( PARTITION BY sourcePagePath ORDER BY sourcePagePath, sourcePageSessionHitsAll DESC ) AS rank
+    FROM pages_with_all_counts
+)
+
 SELECT 
-    sourcePagePath,
-    documentType,
-    COUNT(DISTINCT sessionId) AS sourcePageSessionHitsAll,
-    COUNT(DISTINCT (CASE WHEN allTypesOfHitsInSession = 'isEntrance' THEN sessionId ELSE null END) ) AS sourcePageSessionHitsEntranceOnly,
-    COUNT(DISTINCT (CASE WHEN allTypesOfHitsInSession = 'isExit' THEN sessionId ELSE null END) ) AS sourcePageSessionHitsExitOnly,
-    COUNT(DISTINCT (CASE WHEN STARTS_WITH(allTypesOfHitsInSession, 'isEntranceAndExit') OR STARTS_WITH(allTypesOfHitsInSession, 'isEntrance,') OR STARTS_WITH(allTypesOfHitsInSession, 'isExit,') THEN sessionId ELSE null END) ) AS sourcePageSessionHitsEntranceAndExit
-FROM session_hits_all 
-GROUP BY sourcePagePath, documentType 
-ORDER BY sourcePageSessionHitsAll DESC
+    *
+FROM pages_with_rank
+WHERE rank = 1
 
 );
 
