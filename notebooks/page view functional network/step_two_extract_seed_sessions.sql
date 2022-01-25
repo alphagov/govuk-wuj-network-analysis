@@ -110,6 +110,8 @@ WITH primary_data AS (
         REGEXP_REPLACE(hits.page.pagePath, r'[?#].*', '') AS pagePath,
         CONCAT(fullVisitorId, "-", CAST(visitId AS STRING)) AS sessionId,
         (SELECT value FROM hits.customDimensions WHERE index = 2) AS documentType,
+        (SELECT value FROM hits.customDimensions WHERE index = 3) AS topLevelTaxons,
+        (SELECT value FROM hits.customDimensions WHERE index = 58) AS bottomLevelTaxons, 
         hits.isEntrance,
         hits.isExit
     FROM `govuk-bigquery-analytics.87773428.ga_sessions_*`
@@ -156,6 +158,8 @@ SELECT
     hitNumber,
     pagePath,
     documentType,
+    topLevelTaxons,
+    bottomLevelTaxons,
     isEntrance,
     isExit
 FROM sessions_truncate_urls

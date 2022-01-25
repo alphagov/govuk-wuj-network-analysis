@@ -46,6 +46,8 @@ OUTPUT:
   - `govuk-bigquery-analytics.wuj_network_analysis.nodes_er` 
     - Nodes = `sourcePagePath`
     - Node property = `documentType`
+    - Node property = `topLevelTaxons`
+    - Node property = `bottomLevelTaxons`
     - Node property = `sourcePageSessionHitsAll`
     - Node property = `sourcePageSessionEntranceOnly`
     - Node property = `sourcePageSessionExitOnly`
@@ -79,6 +81,8 @@ source_destination_page_path AS (
         sessionId,
         pagePath AS sourcePagePath,
         documentType,
+        topLevelTaxons,
+        bottomLevelTaxons,
         isEntrance,
         isExit,
         LEAD(pagePath) OVER (PARTITION BY sessionId ORDER BY hitNumber) AS destinationPagePath
@@ -91,6 +95,8 @@ session_hits AS (
         sessionId,
         sourcePagePath,
         documentType,
+        topLevelTaxons,
+        bottomLevelTaxons,
         isEntrance,
         isExit,
         CASE WHEN (isEntrance AND isExit) THEN 'isEntranceAndExit'
@@ -98,19 +104,22 @@ session_hits AS (
              WHEN (isEntrance AND isExit IS NULL) THEN 'isExit'
         END AS entranceOrExit
 FROM source_destination_page_path
-GROUP BY sessionId, sourcePagePath, documentType, isEntrance, isExit
+GROUP BY sessionId, sourcePagePath, documentType, topLevelTaxons, bottomLevelTaxons, isEntrance, isExit
 ),
 
--- aggregate rows over session, pagePath and document type, and identify which 
--- sessions have an entrance and/or exit hit for the pagePath    
+-- aggregate rows over session, pagePath, document type, top level taxons, and 
+-- and bottom level taxons, and identify which sessions have an entrance and/or 
+-- exit hit for the pagePath    
 session_hits_all AS ( 
     SELECT 
         sessionId,
         sourcePagePath,
         documentType,
+        topLevelTaxons,
+        bottomLevelTaxons,
         STRING_AGG(CAST(entranceOrExit AS STRING)) AS allTypesOfHitsInSession
     FROM session_hits
-    GROUP BY sessionId, sourcePagePath, documentType
+    GROUP BY sessionId, sourcePagePath, documentType, topLevelTaxons, bottomLevelTaxons
     ORDER BY allTypesOfHitsInSession
 ),
 
