@@ -32,6 +32,15 @@ ASSUMPTIONS:
 - The edge weight `edgeWeight` is the number of distinct sessions that move between Page A
   and Page B. 
 
+- On the rare occasion, some pagePaths are tagged to a different `documentType`, `bottomLevelTaxon`, 
+  or `topLevelTaxon`. While it is not clear why this is the case, it is possible that this is a problem
+  with the tracking. This is problematic for further analyses, as pagePaths may have multiple entries. 
+  Therefore, we only keep the entry with the highest session hit data. We have chosen the top entry as 
+  we are more confident that the tracking is correct, as it is likely that the other entries have very 
+  low session counts (less than 10, compared to 3000, for example). Note that therefore the top entry 
+  will not have captured the session hits for the other entries, so it is likely that count data is being 
+  underestimated. As this happens rarely, we accept this as a caveat to our data. 
+  
 OUTPUT: 
 - Two tables related to the nodes and edges of the network: 
   - `govuk-bigquery-analytics.wuj_network_analysis.nodes_er` 
@@ -112,24 +121,39 @@ session_hits_all AS (
     FROM session_hits
     GROUP BY sessionId, sourcePagePath, documentType, topLevelTaxons, bottomLevelTaxons
     ORDER BY allTypesOfHitsInSession
-)
+),
 
 -- count distinct sessions that visit a pagePath, count distinct sessions that visit
 -- a pagePath which are an entrance hit only, count distinct sessions that visit a 
 -- pagePath which are an exit hit only, count distinct sessions that visit a pagePath 
 -- which are both an entrance and exit hit
+pages_with_all_counts AS (
+    SELECT 
+        sourcePagePath,
+        documentType,
+        COUNT(DISTINCT sessionId) AS sourcePageSessionHitsAll,
+        COUNT(DISTINCT (CASE WHEN allTypesOfHitsInSession = 'isEntrance' THEN sessionId ELSE null END) ) AS sourcePageSessionHitsEntranceOnly,
+        COUNT(DISTINCT (CASE WHEN allTypesOfHitsInSession = 'isExit' THEN sessionId ELSE null END) ) AS sourcePageSessionHitsExitOnly,
+        COUNT(DISTINCT (CASE WHEN STARTS_WITH(allTypesOfHitsInSession, 'isEntranceAndExit') OR STARTS_WITH(allTypesOfHitsInSession, 'isEntrance,') OR STARTS_WITH(allTypesOfHitsInSession, 'isExit,') THEN sessionId ELSE null END) ) AS sourcePageSessionHitsEntranceAndExit
+    FROM session_hits_all 
+    GROUP BY sourcePagePath, documentType 
+    ORDER BY sourcePageSessionHitsAll DESC
+),
+
+-- select the top page path with document type, taxon, and session hit data. This is 
+-- because sometimes the tracking for taxons is incorrect, which results in multiple rows
+-- for the same page path. 
+pages_with_rank AS ( 
+    SELECT
+        *, 
+        ROW_NUMBER() OVER ( PARTITION BY sourcePagePath ORDER BY sourcePagePath, sourcePageSessionHitsAll DESC ) AS rank
+    FROM pages_with_all_counts
+)
+
 SELECT 
-    sourcePagePath,
-    documentType,
-    topLevelTaxons,
-    bottomLevelTaxons,
-    COUNT(DISTINCT sessionId) AS sourcePageSessionHitsAll,
-    COUNT(DISTINCT (CASE WHEN allTypesOfHitsInSession = 'isEntrance' THEN sessionId ELSE null END) ) AS sourcePageSessionHitsEntranceOnly,
-    COUNT(DISTINCT (CASE WHEN allTypesOfHitsInSession = 'isExit' THEN sessionId ELSE null END) ) AS sourcePageSessionHitsExitOnly,
-    COUNT(DISTINCT (CASE WHEN STARTS_WITH(allTypesOfHitsInSession, 'isEntranceAndExit') OR STARTS_WITH(allTypesOfHitsInSession, 'isEntrance,') OR STARTS_WITH(allTypesOfHitsInSession, 'isExit,') THEN sessionId ELSE null END) ) AS sourcePageSessionHitsEntranceAndExit
-FROM session_hits_all 
-GROUP BY sourcePagePath, documentType, topLevelTaxons, bottomLevelTaxons 
-ORDER BY sourcePageSessionHitsAll DESC
+    *
+FROM pages_with_rank
+WHERE rank = 1
 
 );
 
