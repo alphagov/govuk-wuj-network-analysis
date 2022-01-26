@@ -127,7 +127,7 @@ sessions_remove_document_types AS (
     SELECT 
         *
     FROM primary_data
-    WHERE documentType NOT IN UNNEST(document_types_to_ignore)
+    WHERE documentType NOT IN UNNEST(document_types_to_ignore) OR documentType IS NULL
 ),
 
 -- truncate URLs of certain document types
