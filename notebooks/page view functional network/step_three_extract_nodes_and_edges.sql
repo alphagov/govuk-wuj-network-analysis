@@ -131,12 +131,14 @@ pages_with_all_counts AS (
     SELECT 
         sourcePagePath,
         documentType,
+        topLevelTaxons,
+        bottomLevelTaxons,
         COUNT(DISTINCT sessionId) AS sourcePageSessionHitsAll,
         COUNT(DISTINCT (CASE WHEN allTypesOfHitsInSession = 'isEntrance' THEN sessionId ELSE null END) ) AS sourcePageSessionHitsEntranceOnly,
         COUNT(DISTINCT (CASE WHEN allTypesOfHitsInSession = 'isExit' THEN sessionId ELSE null END) ) AS sourcePageSessionHitsExitOnly,
         COUNT(DISTINCT (CASE WHEN STARTS_WITH(allTypesOfHitsInSession, 'isEntranceAndExit') OR STARTS_WITH(allTypesOfHitsInSession, 'isEntrance,') OR STARTS_WITH(allTypesOfHitsInSession, 'isExit,') THEN sessionId ELSE null END) ) AS sourcePageSessionHitsEntranceAndExit
     FROM session_hits_all 
-    GROUP BY sourcePagePath, documentType 
+    GROUP BY sourcePagePath, documentType, topLevelTaxons, bottomLevelTaxons
     ORDER BY sourcePageSessionHitsAll DESC
 ),
 
