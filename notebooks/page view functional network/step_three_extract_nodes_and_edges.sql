@@ -101,7 +101,7 @@ session_hits AS (
         bottomLevelTaxons,
         isEntrance,
         isExit,
-        sessionHits
+        sessionHits,
         CASE WHEN (isEntrance AND isExit) THEN 'isEntranceAndExit'
              WHEN (isExit AND isEntrance IS NULL) THEN 'isEntrance'
              WHEN (isEntrance AND isExit IS NULL) THEN 'isExit'
