@@ -150,18 +150,37 @@ sessions_with_seed_0_or_1 AS (
     WHERE pagePath IN UNNEST(seed0_pages)
         OR pagePath IN UNNEST(seed1_pages)
     GROUP BY sessionId, pagePath
-)
+),
 
 -- all session data (page hits) that visit at least one `seed0_pages` or `seed1_pages`
-SELECT 
-    sessionId,
-    hitNumber,
-    pagePath,
-    documentType,
-    topLevelTaxons,
-    bottomLevelTaxons,
-    isEntrance,
-    isExit
-FROM sessions_truncate_urls
-WHERE sessionId IN (SELECT sessionId FROM sessions_with_seed_0_or_1)
-ORDER BY sessionId, hitNumber
+all_sessions_seed_0_or_1 AS (       
+    SELECT 
+        sessionId,
+        hitNumber,
+        pagePath,
+        documentType,
+        topLevelTaxons,
+        bottomLevelTaxons,
+        isEntrance,
+        isExit
+    FROM sessions_truncate_urls
+    WHERE sessionId IN (SELECT sessionId FROM sessions_with_seed_0_or_1)
+    ORDER BY sessionId, hitNumber
+),
+    
+-- total session hits
+session_hits AS (
+    SELECT
+        pagePath,
+        COUNT(DISTINCT sessionId) AS sessionHits
+    FROM primary_data
+    GROUP BY pagePath
+)
+
+-- join `session_hits` with `all_sessions_seed_0_or_1`
+SELECT
+    all_sessions_seed_0_or_1.*,
+    sessionHits
+FROM all_sessions_seed_0_or_1 
+LEFT JOIN session_hits 
+ON all_sessions_seed_0_or_1.pagePath = session_hits.pagePath

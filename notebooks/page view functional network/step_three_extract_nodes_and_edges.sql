@@ -52,6 +52,7 @@ OUTPUT:
     - Node property = `sourcePageSessionEntranceOnly`
     - Node property = `sourcePageSessionExitOnly`
     - Node property = `sourcePageSessionEntranceAndExit`
+    - Node property = `sessionHits`
   - `govuk-bigquery-analytics.wuj_network_analysis.edges_er`
     - Edges = `sourcePagePath` to `destinationPagePath`
     - Edge weight = `edgeWeight`
@@ -85,6 +86,7 @@ source_destination_page_path AS (
         bottomLevelTaxons,
         isEntrance,
         isExit,
+        sessionHits,
         LEAD(pagePath) OVER (PARTITION BY sessionId ORDER BY hitNumber) AS destinationPagePath
     FROM page_view_approach
 ),
@@ -99,12 +101,13 @@ session_hits AS (
         bottomLevelTaxons,
         isEntrance,
         isExit,
+        sessionHits,
         CASE WHEN (isEntrance AND isExit) THEN 'isEntranceAndExit'
              WHEN (isExit AND isEntrance IS NULL) THEN 'isEntrance'
              WHEN (isEntrance AND isExit IS NULL) THEN 'isExit'
         END AS entranceOrExit
 FROM source_destination_page_path
-GROUP BY sessionId, sourcePagePath, documentType, topLevelTaxons, bottomLevelTaxons, isEntrance, isExit
+GROUP BY sessionId, sourcePagePath, documentType, topLevelTaxons, bottomLevelTaxons, isEntrance, isExit, sessionHits
 ),
 
 -- aggregate rows over session, pagePath, document type, top level taxons, and 
@@ -117,9 +120,10 @@ session_hits_all AS (
         documentType,
         topLevelTaxons,
         bottomLevelTaxons,
+        sessionHits,
         STRING_AGG(CAST(entranceOrExit AS STRING)) AS allTypesOfHitsInSession
     FROM session_hits
-    GROUP BY sessionId, sourcePagePath, documentType, topLevelTaxons, bottomLevelTaxons
+    GROUP BY sessionId, sourcePagePath, documentType, topLevelTaxons, bottomLevelTaxons, sessionHits
     ORDER BY allTypesOfHitsInSession
 ),
 
@@ -133,12 +137,13 @@ pages_with_all_counts AS (
         documentType,
         topLevelTaxons,
         bottomLevelTaxons,
+        sessionHits,
         COUNT(DISTINCT sessionId) AS sourcePageSessionHitsAll,
         COUNT(DISTINCT (CASE WHEN allTypesOfHitsInSession = 'isEntrance' THEN sessionId ELSE null END) ) AS sourcePageSessionHitsEntranceOnly,
         COUNT(DISTINCT (CASE WHEN allTypesOfHitsInSession = 'isExit' THEN sessionId ELSE null END) ) AS sourcePageSessionHitsExitOnly,
         COUNT(DISTINCT (CASE WHEN STARTS_WITH(allTypesOfHitsInSession, 'isEntranceAndExit') OR STARTS_WITH(allTypesOfHitsInSession, 'isEntrance,') OR STARTS_WITH(allTypesOfHitsInSession, 'isExit,') THEN sessionId ELSE null END) ) AS sourcePageSessionHitsEntranceAndExit
     FROM session_hits_all 
-    GROUP BY sourcePagePath, documentType, topLevelTaxons, bottomLevelTaxons
+    GROUP BY sourcePagePath, documentType, topLevelTaxons, bottomLevelTaxons, sessionHits
     ORDER BY sourcePageSessionHitsAll DESC
 ),
 
