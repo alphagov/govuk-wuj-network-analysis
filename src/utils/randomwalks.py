@@ -5,6 +5,7 @@ from tqdm.notebook import tqdm
 import matplotlib.pyplot as plt
 from itertools import product
 from joblib import Parallel, delayed
+from scipy.sparse import csr_matrix
 
 def group(original_list, n):
     '''Groups original_list into a list of lists, where each list contains n consecutive
@@ -298,3 +299,51 @@ def page_freq_path_freq_ranking(results):
     page_scores.sort_values(by='tfdf_max', inplace=True, ascending=False)
 
     return page_scores
+
+
+def get_transition_matrix(G):
+    '''
+    Computes a transition probability matrix for a graph, using normalised edge weights.
+
+    Args:
+        G: a weighted networkx graph
+    
+    Return:
+        csr_matrix(T_probs): a transition probability matrix as a a csr matrix
+    '''
+
+    # Create array with edge weight
+    T = nx.adjacency_matrix(G, weight="edgeWeight").todense()
+    T_array = np.array(T)
+
+    # Transform edge weight into probabilities
+
+    # Normalisation
+    sum_of_rows = T_array.sum(axis=1)
+    T_probs = T_array / sum_of_rows[:, np.newaxis]
+
+    # Rows with only 0s = nan. Replace nan values with 1/Tarray.shape[0]
+    np.nan_to_num(T_probs, nan=1 / T_array.shape[0], copy=False)
+
+    # Convert into a transition matrix (for random walks function)
+    return csr_matrix(T_probs)
+
+def reformat_graph(G):
+    '''
+    Reformat the graph to make it compliant with existing random walk functions
+    i.e. add the path to a name property and set the index to be a number.
+
+    Args:
+        G: networkx graph
+    
+    Return:
+        G: networkx graph
+    '''
+
+    for index,data in G.nodes(data=True):
+        data['properties'] = dict()
+        data['properties']['name'] = index
+
+    G = nx.convert_node_labels_to_integers(G, first_label=0, ordering='default', label_attribute=None)
+
+    return G
