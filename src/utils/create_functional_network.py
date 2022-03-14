@@ -539,4 +539,11 @@ def create_networkx_graph(nodes, edges):
         "sessionHits",
     )
 
+    # remove nan nodes
+    nan_nodes = []
+    for node in G.nodes():
+        if pd.isnull(node):
+            nan_nodes.append(node)
+    G.remove_nodes_from(nan_nodes)
+
     return G
