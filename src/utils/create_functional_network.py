@@ -338,7 +338,7 @@ def extract_nodes_and_edges(page_view_network):
     # count the number of times a user session visits sourcePagePath to
     # destinationPagePath
     df1 = (
-        df.groupby(["sourcePagePath", "destinationPagePath"])
+        df.groupby(["sourcePagePath", "destinationPagePath"], dropna=False)
         .sessionId.nunique()
         .reset_index(name="edgeWeight")
         .sort_values(by=["edgeWeight"], ascending=False)
@@ -363,7 +363,8 @@ def extract_nodes_and_edges(page_view_network):
                 "sessionHits",
                 "isEntrance",
                 "isExit",
-            ]
+            ],
+            dropna=False,
         )
         .sessionId.nunique()
         .reset_index(name="counts")
@@ -390,7 +391,8 @@ def extract_nodes_and_edges(page_view_network):
                 "topLevelTaxons",
                 "bottomLevelTaxons",
                 "sessionHits",
-            ]
+            ],
+            dropna=False,
         )
         .agg(sourcePageSessionHitsAll=("counts", "sum"))
         .reset_index()
@@ -411,6 +413,17 @@ def extract_nodes_and_edges(page_view_network):
     )
     df4 = df4.drop(columns=["counts", "isEntrance", "isExit"])
 
+    # fill nans and empty cells
+    cols = [
+        "sessionHits",
+        "sourcePageSessionHitsAll",
+        "sourcePageSessionHitsEntranceAndExit",
+        "sourcePageSessionHitsEntranceOnly",
+        "sourcePageSessionHitsExitOnly",
+    ]
+    df4[cols] = df4[cols].fillna(0)
+    df4 = df4.fillna("no value")
+
     # collapse rows so there are no duplicated rows with blank cells
     df4 = (
         df4.mask(df4.astype(str).eq(""))
@@ -423,6 +436,7 @@ def extract_nodes_and_edges(page_view_network):
                 "sessionHits",
                 "sourcePageSessionHitsAll",
             ],
+            dropna=False,
             as_index=False,
         )
         .first()
@@ -435,14 +449,12 @@ def extract_nodes_and_edges(page_view_network):
         df4.sort_values(
             ["sourcePagePath", "sourcePageSessionHitsAll"], ascending=[False, False]
         )
-        .groupby(["sourcePagePath"])
+        .groupby(["sourcePagePath"], dropna=False)
         .cumcount()
         + 1
     )
 
-    df4 = df4[df4["RN"] == 1]
-
-    nodes = df4.sort_values(["sourcePageSessionHitsAll"], ascending=False)
+    nodes = df4[df4["RN"] == 1]
 
     return (nodes, edges)
 
