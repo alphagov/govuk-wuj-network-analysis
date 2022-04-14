@@ -1,6 +1,8 @@
 # `govuk-wuj-network-analysis`
 
-Using network analysis to define sets of pages related to a WUJ
+Using Network Analysis to define a set of pages related to a Whole User Journey (WUJ).
+
+The final output is a Google Colab notebook `page_detector.ipynb`. The `Page Detector` first creates a functional graph of GOV.UK pages based on user movement. This graph is first defined by seed pages that are considered key pages in the WUJ. Pages that are hyperlinked from these seed pages are next included. Where a user visits at least one seed or hyperlinked page, all pages they visit in a session are included. This ultimately creates a functional subgraph of GOV.UK associated with user movement from key pages in a WUJ. We then use a biased random walks approach whose probability to move from a node (i.e. page) to one of its neighbours is based on the proportion of real user sessions that move from that particular page to its neighbours. A ranking method (page frequency-path frequency) is applied to rank a subset of pages associated with a particular WUJ.
 
 ```{warning}
 Where this documentation refers to the root folder we mean where this README.md is
@@ -12,7 +14,7 @@ located.
 To start using this project, [first make sure your system meets its
 requirements](#requirements).
 
-To be added.
+The functional network is based on user movement data and therefore retrives data from Google BigQuery. As such, Google BigQuery credentials are required to run the `Page Detector`.
 
 ### Requirements
 
@@ -24,6 +26,7 @@ To be added.
 - a `.secrets` file with the [required secrets and
   credentials](#required-secrets-and-credentials)
 - [load environment variables][docs-loading-environment-variables] from `.envrc`
+- Google BigQuery credentials
 
 To install the Python requirements, open your terminal and enter:
 
