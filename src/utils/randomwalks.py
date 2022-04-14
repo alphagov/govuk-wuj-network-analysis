@@ -5,6 +5,7 @@ from tqdm.notebook import tqdm
 import matplotlib.pyplot as plt
 from itertools import product
 from joblib import Parallel, delayed
+from scipy.sparse import csr_matrix
 
 def group(original_list, n):
     '''Groups original_list into a list of lists, where each list contains n consecutive
@@ -242,12 +243,12 @@ def M_N_Experiment(steps, repeats, T, G, target_pages, seed_pages, proba, n_jobs
 
 def page_freq_path_freq_ranking(results):
     '''
-    Returns:
-        page_scores (Pandas dataframe): a dataframe of page paths, where the page paths are ranked by the page frequency-path frequency metric.
-
-    Parameters:
+    Args:
         results (dict): the dictionary returned after running repeat_random_walks
                         E.g. results = repeat_random_walks(steps=100, repeats=100, T=A, G=G, seed_pages=seeds, proba=False, combine='union', level=1, n_jobs=1)
+
+    Return:
+        page_scores (Pandas dataframe): a dataframe of page paths, where the page paths are ranked by the page frequency-path frequency metric.
 
     '''
     # create a list of paths [path1, path2, path3, etc], where each path is a list of pages
@@ -298,3 +299,263 @@ def page_freq_path_freq_ranking(results):
     page_scores.sort_values(by='tfdf_max', inplace=True, ascending=False)
 
     return page_scores
+
+
+def get_transition_matrix(G):
+    '''
+    Computes a transition probability matrix for a graph, using normalised edge weights.
+
+    Args:
+        G: a weighted networkx graph
+    
+    Return:
+        csr_matrix(T_probs): a transition probability matrix as a a csr matrix
+    '''
+
+    # Create array with edge weight
+    T = nx.adjacency_matrix(G, weight="edgeWeight").todense()
+    T_array = np.array(T)
+
+    # Transform edge weight into probabilities
+
+    # Normalisation
+    sum_of_rows = T_array.sum(axis=1)
+    T_probs = T_array / sum_of_rows[:, np.newaxis]
+
+    # Rows with only 0s = nan. Replace nan values with 1/Tarray.shape[0]
+    np.nan_to_num(T_probs, nan=1 / T_array.shape[0], copy=False)
+
+    # Convert into a transition matrix (for random walks function)
+    return csr_matrix(T_probs)
+
+def reformat_graph(G):
+    '''
+    Reformat the graph to make it compliant with existing random walk functions
+    i.e. add the path to a name property and set the index to be a number.
+
+    Args:
+        G: networkx graph
+    
+    Return:
+        G: networkx graph
+    '''
+
+    for index,data in G.nodes(data=True):
+        data['properties'] = dict()
+        data['properties']['name'] = index
+
+    G = nx.convert_node_labels_to_integers(G, first_label=0, ordering='default', label_attribute=None)
+
+    return G
+
+def add_additional_information(page_scores, G):
+    '''
+    Add additional information to the random walk output: 
+    - document type
+    - document super type
+    - number of sessions that visit this page
+    - number of sessions where this page is an entrance hit
+    - number of sessions where this page is an exit hit
+    - number of sessions where this page is both an entrance and exit hit
+    - how frequent the page occurs in the whole user journey
+
+    Args:
+        page_scores: pandas dataframe returned by `page_freq_path_freq_ranking()`
+        G: networkx graph
+
+    Return:
+        df_merged: pandas dataframe with additional information
+    '''
+
+    # Document supertypes
+    news_and_comms_doctypes = {
+        "medical_safety_alert",
+        "drug_safety_update",
+        "news_article",
+        "news_story",
+        "press_release",
+        "world_location_news_article",
+        "world_news_story",
+        "fatality_notice",
+        "fatality_notice",
+        "tax_tribunal_decision",
+        "utaac_decision",
+        "asylum_support_decision",
+        "employment_appeal_tribunal_decision",
+        "employment_tribunal_decision",
+        "employment_tribunal_decision",
+        "service_standard_report",
+        "cma_case",
+        "decision",
+        "oral_statement",
+        "written_statement",
+        "authored_article",
+        "correspondence",
+        "speech",
+        "government_response",
+        "case_study",
+    }
+
+    service_doctypes = {
+        "completed_transaction",
+        "local_transaction",
+        "form",
+        "calculator",
+        "smart_answer",
+        "simple_smart_answer",
+        "place",
+        "licence",
+        "step_by_step_nav",
+        "transaction",
+        "answer",
+        "guide",
+    }
+
+    guidance_and_reg_doctypes = {
+        "regulation",
+        "detailed_guide",
+        "manual",
+        "manual_section",
+        "guidance",
+        "map",
+        "calendar",
+        "statutory_guidance",
+        "notice",
+        "international_treaty",
+        "travel_advice",
+        "promotional",
+        "international_development_fund",
+        "countryside_stewardship_grant",
+        "esi_fund",
+        "business_finance_support_scheme",
+        "statutory_instrument",
+        "hmrc_manual",
+        "standard",
+    }
+
+    policy_and_engage_doctypes = {
+        "impact_assessment",
+        "policy_paper",
+        "open_consultation",
+        "policy_paper",
+        "closed_consultation",
+        "consultation_outcome",
+        "policy_and_engagement",
+    }
+
+    research_and_stats_doctypes = {
+        "dfid_research_output",
+        "independent_report",
+        "research",
+        "statistics",
+        "national_statistics",
+        "statistics_announcement",
+        "national_statistics_announcement",
+        "official_statistics_announcement",
+        "statistical_data_set",
+        "official_statistics",
+    }
+
+    transparency_doctypes = {
+        "transparency",
+        "corporate_report",
+        "foi_release",
+        "aaib_report",
+        "raib_report",
+        "maib_report",
+    }
+
+    # Create a df with `pagePath`: `documentType`, `sessionHitsAll`, `entranceHit`, `exitHit`, `entranceAndExitHit`
+    df_dict = {
+        info["properties"]["name"]: [
+            info["documentType"],
+            info["sessionHitsAll"],
+            info["entranceHit"],
+            info["exitHit"],
+            info["entranceAndExitHit"],
+            info["sessionHits"],
+        ]
+        for node, info in G.nodes(data=True)
+    }
+    df_dict = {
+        k: v for (k, v) in df_dict.items() if k in page_scores["pagePath"].tolist()
+    }
+    df_info = (
+        pd.DataFrame.from_dict(
+            df_dict,
+            orient="index",
+            columns=[
+                "documentType",
+                "sessionHitsAll",
+                "entranceHit",
+                "exitHit",
+                "entranceAndExitHit",
+                "sessionHits",
+            ],
+        )
+        .rename_axis("pagePath")
+        .reset_index()
+    )
+
+    # Create a df with document supertypes
+    document_type_dict = dict.fromkeys(list(set(df_info["documentType"])))
+
+    for docType, docSupertype in document_type_dict.items():
+        if docType in news_and_comms_doctypes:
+            document_type_dict[docType] = "news and communication"
+
+        elif docType in service_doctypes:
+            document_type_dict[docType] = "services"
+
+        elif docType in guidance_and_reg_doctypes:
+            document_type_dict[docType] = "guidance and regulation"
+
+        elif docType in policy_and_engage_doctypes:
+            document_type_dict[docType] = "policy and engagement"
+
+        elif docType in research_and_stats_doctypes:
+            document_type_dict[docType] = "research and statistics"
+
+        elif docType in transparency_doctypes:
+            document_type_dict[docType] = "transparency"
+
+        else:
+            document_type_dict[docType] = "other"
+
+    df_docSuper = pd.DataFrame(
+        document_type_dict.items(), columns=["documentType", "documentSupertype"]
+    )
+
+    # Merge dfs
+    df_merged = pd.merge(page_scores, df_info, on="pagePath")
+    df_merged = pd.merge(df_merged, df_docSuper, how="left")
+
+    # Reoder and rename df columns
+    df_merged = df_merged[
+        [
+            "pagePath",
+            "documentType",
+            "documentSupertype",
+            "sessionHitsAll",
+            "entranceHit",
+            "exitHit",
+            "entranceAndExitHit",
+            "sessionHits",
+            "tfdf_max",
+        ]
+    ]
+    df_merged = df_merged.rename(
+        columns={
+            "pagePath": "page path",
+            "documentType": "document type",
+            "documentSupertype": "document supertype",
+            "sessionHitsAll": "number of sessions that visit this page",
+            "entranceHit": "number of sessions where this page is an entrance hit",
+            "exitHit": "number of sessions where this page is an exit hit",
+            "entranceAndExitHit": "number of sessions where this page is both an entrance and exit hit",
+            "sessionHits": "all sessions that visit this page, regardless of the session visiting a seed page",
+            "tfdf_max": "how frequent the page occurs in the whole user journey",
+        }
+    )
+
+    return df_merged
