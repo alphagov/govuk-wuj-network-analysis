@@ -52,8 +52,6 @@ Footer pages are hyperlinked from seed pages, and therefore will always exist in
 
 `sourcePageSessionHitsAll` counts unique sessions per page path and document type.  `sourcePageSessionHitsEntranceOnly`, `sourcePageSessionHitsExitOnly`,  and `sourcePageSessionHitsEntranceAndExit` will take into consideration multiple page hits for the same page path and document type.
 
-For example:
-
 | SESSION   | PAGEPATH | ENTRANCE HIT | EXIT HIT |
 |-----------|----------|--------------|----------|
 | 1         | /brexit  | TRUE         | NULL     |
