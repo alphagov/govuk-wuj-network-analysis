@@ -54,7 +54,7 @@ Footer pages are hyperlinked from seed pages, and therefore will always exist in
 
 For example:
       |      SESSION    |     PAGEPATH     |    ENTRANCE HIT    |  EXIT HIT |
-      -----------------------------------------------------------------------
+      |-----------------|------------------|--------------------|-----------|
       |       1         |     /brexit      |        TRUE        |    NULL   |
       |       1         |       /          |        NULL        |    NULL   |
       |       1         |     /brexit      |        NULL        |    TRUE   |
